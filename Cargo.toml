@@ -1,0 +1,14 @@
+[package]
+name = "xcrust"
+version = "0.1.0"
+authors = ["Greg Hale <imalsogreg@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+
+[lib]
+name = "xcrust"
+src  = "src/lib.rs"
+
+[[bin]]
+name = "xcrust-hello"
