@@ -1,3 +1,5 @@
+pub mod spike;
+
 #[cfg(test)]
 mod tests {
     #[test]
