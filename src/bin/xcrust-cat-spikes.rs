@@ -1,16 +1,18 @@
-use xcrust::spike::mwl_ad::*;
-// use xcrust::version::*;
-use chrono::Duration;
+// use std::io;
+// use std::fs::{File};
+// use std::io::prelude::*;
 
+use xcrust::mwl_ad::{read_spikes};
+use chrono::Duration;
 
 use clap::{crate_version, App, Arg, arg_enum, value_t};
 use clap as Clap;
 
 use std::collections::HashMap;
-use std::env;
-use std::error::Error;
-use std::fmt;
-use std::path::{Path, PathBuf};
+// use std::env;
+// use std::error::Error;
+// use std::fmt;
+use std::path::{PathBuf};
 
 /// Required config for the main conversion command
 #[derive(Clone, Debug)]
@@ -21,13 +23,6 @@ struct ConvertConfig {
     after: Option<Duration>,
     before: Option<Duration>,
 }
-
-#[derive(Debug)]
-enum ConfigError {
-    NoInputFormat,
-    NoOutputFormat,
-}
-
 
 
 arg_enum!{
@@ -49,8 +44,12 @@ enum OutputFormat {
 }
 
 fn main() {
-    let config = parse_config();
-    println!("config: {:?}", config);
+    let config = parse_config().unwrap_or_else(|_| panic!("TODO"));
+    // let mut b = [0; 10];
+    // File::open(config.input_file).unwrap().read(&mut b).unwrap();
+    // println!("config: {:?}", config);
+    
+    println!("b: {:?}", read_spikes(config.input_file.as_path()));
 }
 
 
@@ -85,7 +84,7 @@ fn input_format(
 }
 
 
-fn parse_config() -> Result<ConvertConfig, ConfigError> {
+fn parse_config() -> Result<ConvertConfig, String> {
 
     // Specify commandline interface
     let matches = App::new("xcrust-cat-spikes")
