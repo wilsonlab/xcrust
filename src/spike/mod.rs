@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 pub mod mwl_ad;
+pub mod ascii_draw;
 
 /// A raw `Spike` is a set of waveforems and a timestamp
 /// The voltage and time parameters are both abstract,

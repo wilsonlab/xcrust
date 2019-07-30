@@ -28,9 +28,6 @@ pub fn decode_type(i: i32) -> Result<FormatType,DecodingError> {
         .unwrap_or(Err(DecodingError::UnknownFormatType {code: i}))
 }
 
-pub fn read_spikes(_fp: &Path) -> () {
-    unimplemented!()
-}
 
 
 #[cfg(test)]

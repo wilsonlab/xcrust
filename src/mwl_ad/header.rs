@@ -27,7 +27,7 @@ pub struct Metadata <'a> {
 }
 
 /// Parse Metadata and get a pointer to the file's binary data
-pub fn parse(file_contents: &str) -> Result<(Metadata, &str), HeaderError> {
+pub fn parse(file_contents: &[u8]) -> Result<(Metadata, &[u8]), HeaderError> {
     match parse_header(file_contents) {
         Ok ((file_data, lines)) =>
             Ok ((Metadata { header: lines }, file_data)),
@@ -74,7 +74,7 @@ pub fn lookup_multiple<'a, 'b>(metadata: Metadata<'a>, key: &'b str) -> Vec<&'a 
 }
 
 
-pub fn parse_header(s : &str) -> IResult<&str, Vec<HeaderLine>> {
+pub fn parse_header(s : &[u8]) -> IResult<&[u8], Vec<HeaderLine>> {
     delimited( noms::tag("%%BEGINHEADER\n"),
                separated_list( noms::tag("\n"), header_line ),
                noms::tag("\n%%ENDHEADER\n")
@@ -89,29 +89,25 @@ pub enum HeaderLine <'a> {
 }
 
 
-fn header_line(line: &str) -> IResult<&str, HeaderLine> {
-    dbg!(branch::alt(
-        (sequence::preceded( noms::tag("% "), header_pair ) ,
+fn header_line(line: &[u8]) -> IResult<&[u8], HeaderLine> {
+    branch::alt(
+        (sequence::preceded( noms::tag(b"% "), header_pair ) ,
          header_comment)
-    )(line))
-    // sequence::preceded(
-    //     noms::tag("% "),
-    //     branch::alt( (header_pair, header_comment) )
-    // )(line)
+    )(line)
 }
 
 // Parses like this:
 // "key : value" -> HeaderPair { key: "key", value: "value" }
-fn header_pair(line: &str) -> IResult<&str, HeaderLine> {
+fn header_pair(line: &[u8]) -> IResult<&[u8], HeaderLine> {
     combinator::map(
         sequence::separated_pair(
-            noms::take_while1(|ch| ch != ':' && ch != '\n'),
+            noms::take_while1(|ch| ch != b':' && ch != b'\n'),
             noms::tag(":"),
-            noms::take_while1(|ch| ch != '\n')
+            noms::take_while1(|ch| ch != b'\n')
         ),
-        |(k,v) : (&str, &str)| HeaderLine::HeaderPair {
-            key: k.trim(),
-            value: v.trim()
+        |(k,v) : (&[u8], &[u8])| HeaderLine::HeaderPair {
+            key: str::from_utf8(k).unwrap().trim(),
+            value: str::from_utf8(v).unwrap().trim()
         }
     )(line)
 }
@@ -121,16 +117,16 @@ fn header_pair(line: &str) -> IResult<&str, HeaderLine> {
 // "%\n"          -> HeaderComment {comment: ""}
 // The ':' signifying Pair (as opposed to Comment) is handled
 // upstream of this parser, so we don't need to handle it here
-fn header_comment(line: &str) -> IResult<&str, HeaderLine> {
+fn header_comment(line: &[u8]) -> IResult<&[u8], HeaderLine> {
     branch::alt(
         (combinator::map(
-            sequence::preceded(noms::tag("% "), noms::take_while(|ch| ch != '\n')),
-            |s| HeaderLine::HeaderComment { comment: s }),
+            sequence::preceded(noms::tag(b"% "), noms::take_while(|ch| ch != b'\n')),
+            |s| HeaderLine::HeaderComment { comment: str::from_utf8(s).unwrap() }),
          combinator::value(
              HeaderLine::HeaderComment { comment: "" },
              sequence::preceded(
-                 noms::tag("%"),
-                 combinator::peek( noms::tag("\n") )
+                 noms::tag(b"%"),
+                 combinator::peek( noms::tag(b"\n") )
              )
          )
         )
@@ -144,36 +140,39 @@ mod tests {
 
     #[test]
     fn it_parses_header_pair() {
-        assert_eq!(header_pair("key : value"),
-                   Ok(("", HeaderLine::HeaderPair { key: "key",
-                                                    value: "value" })
+        assert_eq!(header_pair(b"key : value"),
+                   Ok((str::as_bytes(""),
+                       HeaderLine::HeaderPair{ key: "key",
+                                               value: "value" })
                    )
         );
     }
     #[test]
     fn it_parses_header_comment() {
-        assert_eq!(header_comment("% Some comment"),
-                   Ok(("", HeaderLine::HeaderComment { comment: "Some comment" }))
+        assert_eq!(header_comment(b"% Some comment"),
+                   Ok((str::as_bytes(""), HeaderLine::HeaderComment { comment: "Some comment" }))
         );
     }
 
     #[test]
     fn it_stops_after_header_pair() {
-        assert_eq!(header_line("% key: value\nleftover"),
-                   Ok(("\nleftover", HeaderLine::HeaderPair{key: "key", value: "value"}))
+        assert_eq!(header_line(b"% key: value\nleftover"),
+                   Ok((str::as_bytes("\nleftover"),
+                       HeaderLine::HeaderPair{key: "key", value: "value"}))
         );
     }
 
     #[test]
     fn it_stops_after_header_comment() { 
-        assert_eq!(header_line("% Some comment\nleftover"),
-                   Ok(("\nleftover", HeaderLine::HeaderComment{comment: "Some comment"}))
+        assert_eq!(header_line(b"% Some comment\nleftover"),
+                   Ok((str::as_bytes("\nleftover"),
+                       HeaderLine::HeaderComment{comment: "Some comment"}))
         );
     }
 
     #[test]
     fn it_parses_header_line_small () {
-        let r = parse_header(HEADER_FIXTURE_SMALL);
+        let r = parse_header(str::as_bytes(HEADER_FIXTURE_SMALL));
         assert_eq!(
             r.clone().map(|vs| vs.1[0]),
             Ok (HeaderLine::HeaderPair { key: "Program", value: "./adextract"})
@@ -186,7 +185,7 @@ mod tests {
 
     #[test]
     fn it_parses_header_big () {
-        let (m,_) = parse(HEADER_FIXTURE).unwrap();
+        let (m,_) = parse(str::as_bytes(HEADER_FIXTURE)).unwrap();
         assert_eq!(lookup(&m, "Program"), Some("./adextract"));
         assert_eq!(require(&m, "Argc"), Ok("8"));
     }

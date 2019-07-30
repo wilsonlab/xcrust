@@ -1,17 +1,14 @@
-// use std::io;
-// use std::fs::{File};
-// use std::io::prelude::*;
+use std::io::prelude::*;
 
-use xcrust::mwl_ad::{read_spikes};
+use std::io::stdin;
+use xcrust::spike::mwl_ad::{read_spikes};
+use xcrust::spike::ascii_draw;
 use chrono::Duration;
 
 use clap::{crate_version, App, Arg, arg_enum, value_t};
 use clap as Clap;
 
 use std::collections::HashMap;
-// use std::env;
-// use std::error::Error;
-// use std::fmt;
 use std::path::{PathBuf};
 
 /// Required config for the main conversion command
@@ -40,6 +37,7 @@ arg_enum!{
 enum OutputFormat {
     SpikeDebug,
     SpikeJSON,
+    SpikeAscii,
 }
 }
 
@@ -49,8 +47,20 @@ fn main() {
     // File::open(config.input_file).unwrap().read(&mut b).unwrap();
     // println!("config: {:?}", config);
     
-    println!("b: {:?}", read_spikes(config.input_file.as_path()));
+    // println!("b: {:?}", read_spikes(config.input_file.as_path()));
+    let spikes = read_spikes( config.input_file.to_str().unwrap() );
+    match config.output_format {
+        OutputFormat::SpikeDebug => println!("spikes: {:?}", spikes),
+        OutputFormat::SpikeJSON => panic!("not implemented"),
+        OutputFormat::SpikeAscii => for s in spikes {
+            let plot = ascii_draw::DEFAULT_PLOT;
+            ascii_draw::draw_spike(plot, &s.waveforms);
+            let _ = stdin().read(&mut [0u8]).unwrap();
+        },
+        
+    }
 }
+
 
 
 fn input_format(
