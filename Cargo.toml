@@ -5,6 +5,13 @@ authors = ["Greg Hale <imalsogreg@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+clap   = "2.33.0"
+chrono = "0.4.7"
+failure = "0.1.5"
+nom = "5.0.0"
+num = "0.2.0"
+num-traits = "0.2.8"
+num-derive = "0.2.5"
 
 [lib]
 name = "xcrust"
@@ -12,3 +19,6 @@ src  = "src/lib.rs"
 
 [[bin]]
 name = "xcrust-hello"
+
+[[bin]]
+name = "xcrust-cat-spikes"
