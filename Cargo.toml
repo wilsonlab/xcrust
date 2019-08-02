@@ -18,7 +18,7 @@ name = "xcrust"
 src  = "src/lib.rs"
 
 [[bin]]
-name = "xcrust-hello"
+name = "xcrust-cat-spikes"
 
 [[bin]]
-name = "xcrust-cat-spikes"
+name = "xcrust-cat-pos"

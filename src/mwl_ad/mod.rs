@@ -1,18 +1,16 @@
 pub mod header;
 
-use std::path::{Path};
-
 #[derive(Debug, FromPrimitive, PartialEq, ToPrimitive)]
 pub enum FormatType {
     InvalidT = 0,
-    CharT    = 1,
-    ShortT   = 2,
-    IntT     = 3,
-    FloatT   = 4,
-    DoubleT  = 5,
+    CharT    = 1, // u8
+    ShortT   = 2, // i16
+    IntT     = 3, // i32
+    FloatT   = 4, // f32
+    DoubleT  = 5, // f64
     FuncT    = 6,
     FFuncT   = 7,
-    ULongT   = 8,
+    ULongT   = 8, // u64
     UnknownT = -1,
 }
 

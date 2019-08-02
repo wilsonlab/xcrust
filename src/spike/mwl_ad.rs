@@ -10,7 +10,7 @@ use nom::number::complete as nomnum;
 
 // use nom::combinator as nom;
 
-use super::{Spike, SpikeSI};
+use super::{Spike};
 // use super::mwl_ad;
 use crate::mwl_ad::header;
 
@@ -51,12 +51,12 @@ fn parse_spikes(gains : Vec<f32>, input: &[u8]) -> IResult<&[u8], Vec<Spike<f32,
     nomm::many0(
     nomc::map(
         noms::pair(
-            nomnum::le_i32, // unsigned long
+            nomnum::le_u32, // unsigned long (timestamp)
             nomm::count(nomnum::le_i16, 128)
         ),
         |(t,vs)| {
             let time = t as f32 / 10_000.0;
-            // let scale_v = move |v : &i16| (*v as f32);
+
             let voltages : Vec<f32> = vs
                 .into_iter()
                 .zip( gains.iter().cycle() )
@@ -71,21 +71,8 @@ fn parse_spikes(gains : Vec<f32>, input: &[u8]) -> IResult<&[u8], Vec<Spike<f32,
                 let chan = i % 4;
                 waveforms[chan].push(voltages[i]);
             };
-            // let waveforms : Vec<Vec<f32>> = vec![to_waveform((0,31)),
-            //                                      to_waveform((32,63)),
-            //                                      to_waveform((64,95)),
-            //                                      to_waveform((96,127))
-            // ];
+
             Spike {time, waveforms}
         }
     ))(input)
-}
-
-
-pub fn placeholder() {
-    let my_test_spike: Spike<u32, u32> = Spike {
-        waveforms: vec![vec![0, 1, 2]],
-        time: 1,
-    };
-    println!("hi. it's {:?}", my_test_spike);
 }
