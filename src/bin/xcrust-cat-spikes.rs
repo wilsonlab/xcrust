@@ -43,11 +43,6 @@ enum OutputFormat {
 
 fn main() {
     let config = parse_config().unwrap_or_else(|_| panic!("TODO"));
-    // let mut b = [0; 10];
-    // File::open(config.input_file).unwrap().read(&mut b).unwrap();
-    // println!("config: {:?}", config);
-    
-    // println!("b: {:?}", read_spikes(config.input_file.as_path()));
     let spikes = read_spikes( config.input_file.to_str().unwrap() );
     match config.output_format {
         OutputFormat::SpikeDebug => println!("spikes: {:?}", spikes),
