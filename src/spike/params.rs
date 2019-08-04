@@ -1,4 +1,7 @@
 use std::collections::{HashMap};
+use crate::mwl_ad;
+use std::fmt;
+use crate::num::Float;
 use crate::spike::{Spike};
 use crate::pos::{DiodePos};
 
@@ -204,6 +207,22 @@ pub enum Param {
 const MAXTEMPLATES    : i32 = 10;
 const MAXTEMPLATESIZE : i32 = 64;
 
+
+pub fn output_type(p: &Param) -> mwl_ad::FormatType {
+    match p {
+        Param::T_PX    | Param::T_PY  | Param::T_PA    | Param::T_PB    |
+        Param::POS_X   | Param::POS_Y | Param::T_MAXWD | Param::T_MAXHT |
+        Param::T_TPX   | Param::T_TPY | Param::T_TPA   | Param::T_TPB
+            => mwl_ad::FormatType::ShortT,
+        Param::TIME
+            => mwl_ad::FormatType::DoubleT,
+        Param::TIMESTAMP
+            => mwl_ad::FormatType::ULongT,
+        _
+            => mwl_ad::FormatType::FloatT,
+    }
+}
+
 /* 
  ** tetrode integral relative to peak 
  ** They are interchangeable with non-tetrode counterparts
@@ -239,19 +258,101 @@ fn parse_param(i : &str) -> Option<&Param> {
     PARAM_LOOKUP_TABLE.get( &i.to_owned().to_lowercase() ).clone()
 }
 
+#[derive (Clone, Copy, Debug, PartialEq)]
 enum ParamValue
 {
-    PInt   (u32),
-    PFloat (f32),
+    PInt    (i32),
+    PShort  (i16),
+    PFloat  (f32),
+    PDouble (f64),
 }
 
 // Associate params with functions from (spike, pos) to some value
 // TODO: Can we somehow replace this with traits?
 fn compute_param( param: Param,
-                  spike: Spike<f32, f32>,
-                  pos_now: DiodePos<f32, f32> ) -> ParamValue {
-    unimplemented!()
+                  mut cache: &mut ParamCache,
+                  spike: &Spike<f32, f32>,
+                  pos:   &DiodePos<f32, f32> ) -> ParamValue {
+    match param {
+        Param::TIME  => ParamValue::PDouble(spike.time as f64),
+        Param::POS_X => pos_x_param( pos ),
+        Param::POS_Y => pos_y_param( pos ),
+        Param::T_PX  => tetrode_amplitude( spike, 0, &mut cache),
+        Param::T_PY  => tetrode_amplitude( spike, 1, &mut cache),
+        Param::T_PA  => tetrode_amplitude( spike, 2, &mut cache),
+        Param::T_PB  => tetrode_amplitude( spike, 3, &mut cache),
+        _ => unimplemented!()
+    }
 }
+
+fn pos_x_param(pos: &DiodePos<f32,f32>) -> ParamValue {
+    let v = ((pos.diode_front.0 + pos.diode_back.0)*0.5).round();
+    ParamValue::PShort( v as i16 )
+}
+
+fn pos_y_param(pos: &DiodePos<f32,f32>) -> ParamValue {
+    let v = ((pos.diode_front.1 + pos.diode_back.1)*0.5).round();
+    ParamValue::PShort( v as i16 )
+}
+
+// For a given tetrode and channel, get that channels amplitude
+// at the time when the whole tetrode is at its global maximum
+// If the requested channel happens to contain the global maximum,
+// then the result is the index of this channel's maximum.
+// Often though, the global maximum occurs on a different channel.
+// Since this parameter fetching function will usually be called
+// multiple times (e.g. 4 times for a tetrode) for a single spike,
+// we allow the global-maximum to be cached (otherwise we would do
+// the same global-max search e.g. 4 times
+fn tetrode_amplitude( // param: Param,
+                     spike: &Spike<f32, f32>,
+                     channel: usize,
+                     mut cache: &mut ParamCache) -> ParamValue {
+    let get_global_max = || {
+        let mut max_so_far = f32::min_value();
+        let mut ind_so_far = 0;
+        let n_chan = spike.waveforms.len();
+        for chan in 0..n_chan {
+            let this_samps = &spike.waveforms[chan];
+            for ind in 0..(this_samps.len()) {
+                if this_samps[ind] > max_so_far {
+                    max_so_far = this_samps[ind];
+                    ind_so_far = ind;
+                };
+            }
+        };
+        ParamValue::PInt(ind_so_far as i32)
+        };
+
+    match cache_value("t_v_max", get_global_max, &mut cache) {
+        ParamValue::PInt(global_max_time)
+            => ParamValue::PFloat( spike.waveforms[channel][global_max_time as usize] ),
+        _ => panic!("Impossible case!")
+    }
+}
+
+type ParamCache<'a> = HashMap<&'static str, (u32, ParamValue)>;
+
+// TODO: Can this be done with less copying?
+fn cache_value<'a>( cache_key: &'static str,
+                mut compute_cache_value: (impl FnMut() -> ParamValue),
+                cache: &'a mut ParamCache<'a>
+) -> ParamValue {
+    let cached_v = cache.get(cache_key);
+    match cached_v {
+        Some(&(n,v)) => {
+            cache.insert(cache_key, (n+1,v));
+            v.clone()
+        },
+        None => {
+            let v = compute_cache_value();
+            cache.insert(cache_key, (0,v));
+            v.clone()
+        }
+    }
+}
+
+                      
 
 #[cfg(test)]
 mod tests {
@@ -265,5 +366,19 @@ mod tests {
     #[test]
     fn it_fails_parsing_nonsense() {
         assert_eq!( parse_param("t_nonsense"), None);
+    }
+
+    #[test]
+    fn it_caches() {
+        let mut cache = HashMap::new();
+        let get_int = || {
+            ParamValue::PInt(3)
+        };
+        let x = cache_value("x", get_int, &mut cache);
+        let y = cache_value("x", get_int, &mut cache);
+        let n = cache.get("x").map(|&(n,_)| n);
+        assert_eq!(x, ParamValue::PInt(3));
+        assert_eq!(y, x);
+        assert_eq!(n, Some(1));
     }
 }
