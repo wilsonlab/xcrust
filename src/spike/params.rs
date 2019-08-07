@@ -244,7 +244,7 @@ lazy_static!{
         for i in 0..140{
             match num::FromPrimitive::from_i32(i) {
                 Some( param ) => {
-                    hm.insert( format!("{:?}",param).to_lowercase() , param );
+                    hm.insert( format!("{:?}",param).to_lowercase(), param );
                 },
                 _ => {}
             };
@@ -265,6 +265,14 @@ enum ParamValue
     PShort  (i16),
     PFloat  (f32),
     PDouble (f64),
+}
+
+fn compute_params( params: Vec<Param>,
+                   spike:  &Spike<f32,f32>,
+                   pos:    &DiodePos<f32,f32>) -> Vec<ParamValue>
+{
+    let mut cache = HashMap::new();
+    params.into_iter().map(|p| compute_param(p, &mut cache, spike, pos)).collect()
 }
 
 // Associate params with functions from (spike, pos) to some value
@@ -381,4 +389,36 @@ mod tests {
         assert_eq!(y, x);
         assert_eq!(n, Some(1));
     }
+
+    #[test]
+    fn it_computes_spike_params() {
+        let test_spike =
+            Spike { time: 100.00,
+                    waveforms: vec![
+                        vec![0.0, 0.1, 0.9, 0.6, 0.5, -0.2, -0.1, 0.0],
+                        vec![0.0, 0.9, 0.9, 0.9, 0.9,  0.4, -0.2, 0.0],
+                        vec![0.0, 1.0, 0.9, 0.9, 0.9,  0.4, -0.2, 0.0],
+                        vec![0.0, 0.9, 0.9, 0.9, 0.9,  0.4, -0.2, 0.0]
+                        //        ^^^-- Here is the global-max time
+                    ],
+            };
+        let test_pos =
+            DiodePos { time: 99.9,
+                       diode_front: (2.0,1.0),
+                       diode_back:  (8.0,3.0)
+            };
+        let params = vec![Param::TIME, Param::POS_X, Param::POS_Y,
+                          Param::T_PX, Param::T_PY,  Param::T_PA,  Param::T_PB];
+        let spike_params = compute_params( params, &test_spike, &test_pos );
+        assert_eq!(spike_params,
+                   vec![ParamValue::PDouble(100.00),
+                        ParamValue::PShort(5),
+                        ParamValue::PShort(2),
+                        ParamValue::PFloat(0.1),
+                        ParamValue::PFloat(0.9),
+                        ParamValue::PFloat(1.0),
+                        ParamValue::PFloat(0.9)
+                   ]);
+    }
+
 }
