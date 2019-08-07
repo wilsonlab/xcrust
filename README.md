@@ -1,6 +1,8 @@
 xcrust
 ===
 
+[![Build Status](https://travis-ci.org/wilsonlab/xcrust.svg?branch=master)](https://travis-ci.org/wilsonlab/xcrust)
+
 An experimental rewrite of mwl code in [rust](https://rust-lang.org).
 
 If [coreutils can do it](https://github.com/uutils/coreutils), so can we!
