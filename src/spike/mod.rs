@@ -11,7 +11,7 @@ pub mod ascii_draw;
 /// the container for these `Spike`s - for instance, an AD
 /// spike file will provide the sampling rate and a function
 /// for converting a u8 into absolute voltage
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Spike<V, T> {
     pub waveforms: Vec<Vec<V>>,
     pub time: T,

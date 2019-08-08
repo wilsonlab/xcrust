@@ -1,4 +1,5 @@
 use std::collections::{HashMap};
+use std::convert::{identity};
 use crate::mwl_ad;
 use std::fmt;
 use crate::num::Float;
@@ -204,8 +205,9 @@ pub enum Param {
     T_H4      =   134,
 }
 
-const MAXTEMPLATES    : i32 = 10;
-const MAXTEMPLATESIZE : i32 = 64;
+// // TODO: uncomment these when we support templates
+// const MAXTEMPLATES    : i32 = 10;
+// const MAXTEMPLATESIZE : i32 = 64;
 
 
 pub fn output_type(p: &Param) -> mwl_ad::FormatType {
@@ -223,12 +225,14 @@ pub fn output_type(p: &Param) -> mwl_ad::FormatType {
     }
 }
 
-/* 
- ** tetrode integral relative to peak 
- ** They are interchangeable with non-tetrode counterparts
- */
-const T_INPM3M6   : Param =  Param::INPM3M6;
-const T_INPP12M12 : Param =  Param::INPP12M12;
+
+// TODO: Uncomment these when we support integral relative to peak
+// /* 
+//  ** tetrode integral relative to peak 
+//  ** They are interchangeable with non-tetrode counterparts
+//  */
+// const T_INPM3M6   : Param =  Param::INPM3M6;
+// const T_INPP12M12 : Param =  Param::INPP12M12;
 
 // There are very many variants in the Param enum, so it would
 // require a lot of error-prone typing to create a function for
@@ -266,6 +270,58 @@ enum ParamValue
     PFloat  (f32),
     PDouble (f64),
 }
+
+trait Timestamp {
+    fn timestamp(spike: &Self) -> f32;
+}
+
+impl <T> Timestamp for Spike<T,f32>{
+    fn timestamp(spike: &Self) -> f32 {
+        spike.time
+    }
+}
+
+impl <T> Timestamp for DiodePos<T,f32>{
+    fn timestamp(pos: &Self) -> f32 {
+        pos.time
+    }
+}
+
+fn spike_pos_earliest_interpolation<'a, T,P,V>
+    (
+        spikes: &'a Vec<Spike<V,T>>,
+        poss:   &'a Vec<DiodePos<P,T>>
+    ) -> Vec<(&'a Spike<V,T>, &'a DiodePos<P,T>)>
+where
+    T: PartialOrd,
+{
+    let mut ps      = poss.iter();
+    let     first_p = ps.next();
+    let mut recent_p : Option<&DiodePos<P,T>> = first_p;
+    let mut next_p   : Option<&DiodePos<P,T>> = ps.next();
+
+    spikes
+        .iter()
+        .filter_map(|s| {
+            while next_p.map(|p| p.time <= s.time) == Some(true) {
+                recent_p = next_p;
+                next_p = ps.next();
+            }
+
+            // recent_p and next_p must both be non-None
+            recent_p
+                .and_then(|p|
+                          next_p.and_then(|_|
+                          if s.time > p.time {
+                              Some((s,p))
+                          } else { None })
+                )
+        })
+        .collect()
+}
+
+
+
 
 fn compute_params( params: Vec<Param>,
                    spike:  &Spike<f32,f32>,
@@ -419,6 +475,35 @@ mod tests {
                         ParamValue::PFloat(1.0),
                         ParamValue::PFloat(0.9)
                    ]);
+    }
+
+    #[test]
+    fn it_interpolates_spikes() {
+        let mk_spike = |t: f32| Spike { time: t, waveforms: vec![vec![t]] };
+        let mk_pos   = |t: f32| DiodePos
+        { time: t,
+          diode_front: (t,t),
+          diode_back: (t,t)
+        };
+        let spikes : Vec<Spike<f32,f32>> =
+            vec![1.0,2.0,3.0,4.0].into_iter().map(mk_spike).collect();
+        let poss : Vec<DiodePos<f32,f32>> =
+            vec![1.5, 3.0].into_iter().map(mk_pos).collect();
+        let interpolated = spike_pos_earliest_interpolation(&spikes, &poss);
+        println!("interpolated: {:?}", interpolated);
+        let expectation  =
+            vec![ // (mkTestSpike(1.6), mkTestPos(1.5)),
+                  (mk_spike(2.0), mk_pos(1.5)),
+                  (mk_spike(3.0), mk_pos(3.0))
+            ];
+        assert!(
+            interpolated
+                .into_iter()
+                .zip(expectation)
+                .map(|((s1,p1),(s2,p2))| s1 == &s2 && p1 == &p2)
+                .all(identity)
+
+        );
     }
 
 }
